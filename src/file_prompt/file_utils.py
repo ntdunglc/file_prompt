@@ -29,6 +29,12 @@ class FileInfo:
         try:
             with open(self.path, "r", encoding="utf-8") as f:
                 return f.read()
+        except IsADirectoryError:
+            logger.warning(f"Skipping directory: {self.path}")
+            return None  # Skip directories
+        except UnicodeDecodeError as e:
+            logger.debug(f"Skipping binary file: {self.path}: {e}")
+            return None  # Skip binary files
         except Exception as e:
             logger.error(f"Error reading file {self.path}: {e}")
             return None
@@ -74,22 +80,26 @@ def generate_tree(paths: list[str], base_path: str) -> str:
     Returns:
         str: A formatted string representing the file tree
     """
-    tree = []
     rel_paths = [os.path.relpath(p, base_path) for p in paths]
     rel_paths.sort()
 
-    for i, path in enumerate(rel_paths):
+    tree_structure = {}
+    for path in rel_paths:
         parts = path.split(os.sep)
-        indent = "    " * (len(parts) - 1)
+        current_level = tree_structure
+        for part in parts:
+            if part not in current_level:
+                current_level[part] = {}
+            current_level = current_level[part]
 
-        # Check if this is the last item at this level
-        next_parts = rel_paths[i + 1].split(os.sep) if i < len(rel_paths) - 1 else []
-        is_last_at_level = (
-            len(next_parts) <= len(parts)
-            or next_parts[: len(parts)] != parts[: len(parts)]
-        )
+    def render_tree(structure, indent=""):
+        lines = []
+        items = sorted(structure.keys())
+        for index, item in enumerate(items):
+            prefix = "└── " if index == len(items) - 1 else "├── "
+            lines.append(indent + prefix + item)
+            lines.extend(render_tree(structure[item], indent + "    "))
+        return lines
 
-        prefix = "└── " if is_last_at_level else "├── "
-        tree.append(f"{indent}{prefix}{parts[-1]}")
-
-    return "\n".join(tree)
+    tree_lines = render_tree(tree_structure)
+    return "\n".join(tree_lines) if tree_lines else "└── ."

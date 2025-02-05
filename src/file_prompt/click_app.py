@@ -12,7 +12,7 @@ import click
 from jinja2 import Template
 
 from file_prompt.collector import RecordCollector
-from file_prompt.plugin import FileSystemPlugin, FileSystemConfig
+from file_prompt.plugin import FileSystemPlugin, FileSystemConfig, Record
 from file_prompt.file_utils import FileInfo, generate_tree
 
 # Configure logging
@@ -116,7 +116,9 @@ def main(
 
         # Extract file paths from records
         file_paths = [
-            record.source for record in collected_records if hasattr(record, "source")
+            record.source
+            for record in collected_records
+            if hasattr(record, "source") and isinstance(record, Record)
         ]
 
         # Create FileInfo objects for rendering

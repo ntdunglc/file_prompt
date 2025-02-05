@@ -46,6 +46,11 @@ def file_system(tmp_path) -> Path:
     (src / "nested" / "util.py").write_text("def util(): pass")
     (src / "nested" / "data.txt").write_text("some data")
 
+    # Create hidden files and directories
+    (src / ".hidden_file.txt").write_text("hidden file")
+    (src / ".hidden_dir").mkdir()
+    (src / ".hidden_dir" / "inner_hidden.txt").write_text("inner hidden file")
+
     return tmp_path
 
 
@@ -75,7 +80,7 @@ def test_create_record_directory(test_config, file_system):
 
     # Test directory contents
     records = list(record.get_records())
-    assert len(records) == 3  # main.py, README.txt, nested/
+    assert len(records) == 3  # main.py, README.txt, nested/, but not hidden files/dirs
     assert any(r.source.endswith("main.py") for r in records)
     assert any(r.source.endswith("README.txt") for r in records)
     assert any(isinstance(r, DirectoryRecord) for r in records)
@@ -129,7 +134,7 @@ def test_collect_records_with_prefix_map(test_config, file_system):
     plugin = FileSystemPlugin(config)
 
     # Create instruction file with prefixed path
-    instruction_path = file_system / "instruction.txt"
+    instruction_path = file_system / "instruction.txt"  # fix typo here
     instruction_path.write_text("project/nested/util.py")
 
     # Process instruction file
@@ -194,10 +199,131 @@ def test_create_record_with_invalid_path(test_config):
     plugin = FileSystemPlugin(test_config)
 
     # Test with None
-    assert plugin.create_record_if_can_handle(None) is None
+    assert plugin.create_record_if_can_handle(None) is None  # fix typo here
 
     # Test with invalid path characters
     assert plugin.create_record_if_can_handle("\0invalid") is None
 
     # Test with empty string
     assert plugin.create_record_if_can_handle("") is None
+
+
+def test_ignore_hidden_files_and_directories(file_system):
+    """Test ignoring hidden files and directories."""
+    config = FileSystemConfig(
+        include_patterns=["*.py", "*.txt"],
+        exclude_patterns=["test_*.py"],
+        instruction_extensions=["txt"],
+        prefix_map={"src": "."},
+        respect_gitignore=False,
+        ignore_hidden=True,  # Explicitly set to True
+    )
+    plugin = FileSystemPlugin(config)
+    dir_path = file_system / "src"
+    record = plugin.create_record_if_can_handle(str(dir_path))
+    assert isinstance(record, DirectoryRecord)
+    records = list(record.get_records())
+
+    hidden_files_present = any(r.source.endswith(".hidden_file.txt") for r in records)
+    hidden_dir_present = any(r.source.endswith(".hidden_dir") for r in records)
+
+    assert not hidden_files_present, "Hidden files should be ignored"
+    assert not hidden_dir_present, "Hidden directories should be ignored"
+
+
+def test_show_hidden_files_and_directories(file_system):
+    """Test showing hidden files and directories."""
+    config = FileSystemConfig(
+        include_patterns=["*.py", "*.txt"],
+        exclude_patterns=["test_*.py"],
+        instruction_extensions=["txt"],
+        prefix_map={"src": "."},
+        respect_gitignore=False,
+        ignore_hidden=False,  # Explicitly set to False to show hidden
+    )
+    plugin = FileSystemPlugin(config)
+    dir_path = file_system / "src"
+    record = plugin.create_record_if_can_handle(str(dir_path))
+    assert isinstance(record, DirectoryRecord)
+    records = list(record.get_records())
+
+    hidden_files_present = any(r.source.endswith(".hidden_file.txt") for r in records)
+    hidden_dir_present = any(r.source.endswith(".hidden_dir") for r in records)
+
+    assert hidden_files_present, "Hidden files should be shown"
+    assert hidden_dir_present, "Hidden directories should be shown"
+
+
+def test_respect_gitignore_option(file_system):
+    """Test respecting .gitignore."""
+    gitignore_content = """
+    *.txt
+    nested/
+    """
+    (file_system / "src" / ".gitignore").write_text(gitignore_content)
+
+    config = FileSystemConfig(
+        include_patterns=["*.py", "*.txt"],
+        exclude_patterns=["test_*.py"],
+        instruction_extensions=["txt"],
+        prefix_map={"src": "."},
+        respect_gitignore=True,  # Explicitly set to True
+        ignore_hidden=True,
+    )
+    plugin = FileSystemPlugin(config)
+    dir_path = file_system / "src"
+    record = plugin.create_record_if_can_handle(str(dir_path))
+    assert isinstance(
+        record, DirectoryRecord
+    ), f"Expected DirectoryRecord, but got {type(record)} for {dir_path}"
+    records = list(record.get_records())
+    print()
+
+    txt_files_present = any(r.source.endswith(".txt") for r in records)
+    nested_dir_present = any(
+        isinstance(r, DirectoryRecord) and r.source.endswith("nested") for r in records
+    )
+
+    assert not txt_files_present, ".txt files should be ignored by gitignore"
+    assert not nested_dir_present, "nested directory should be ignored by gitignore"
+    assert any(
+        r.source.endswith("main.py") for r in records
+    ), "main.py should still be present"
+
+
+def test_no_gitignore_option(file_system):
+    """Test ignoring .gitignore."""
+    gitignore_content = """
+    *.txt
+    nested/
+    """
+    (file_system / "src" / ".gitignore").write_text(gitignore_content)
+
+    config = FileSystemConfig(
+        include_patterns=["*.py", "*.txt"],
+        exclude_patterns=["test_*.py"],
+        instruction_extensions=["txt"],
+        prefix_map={"src": "."},
+        respect_gitignore=False,  # Explicitly set to False
+        ignore_hidden=True,
+    )
+    plugin = FileSystemPlugin(config)
+    dir_path = file_system / "src"
+    record = plugin.create_record_if_can_handle(str(dir_path))
+    assert isinstance(
+        record, DirectoryRecord
+    ), f"Expected DirectoryRecord, but got {type(record)} for {dir_path}"
+    records = list(record.get_records())
+
+    txt_files_present = any(r.source.endswith(".txt") for r in records)
+    nested_dir_present = any(
+        isinstance(r, DirectoryRecord) and r.source.endswith("nested") for r in records
+    )
+
+    assert txt_files_present, ".txt files should be present when gitignore is False"
+    assert (
+        nested_dir_present
+    ), "nested directory should be present when gitignore is False"
+    assert any(
+        r.source.endswith("main.py") for r in records
+    ), "main.py should still be present"

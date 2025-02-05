@@ -1,0 +1,29 @@
+Write a python script
+* take a list of file paths (--paths), a list of "instruction file extensions" (--instruction_extensions, default ["txt"]
+* take a list of --include, --exclude. Both take a list of glob patterns "*.txt"
+* take --gitignore (default: true), to respects .gitignore
+* take a list of --prefix_map, default value is ["google3=."], It'll be used to map the prefix of extracted file path to the path relative to current pwd.
+* if a path is a folder, traverse the folder recursively and collect the files
+* if a path is a file, parse the file context to extract the list of file paths in that file, which starts with "./", "../", "/abc/def", or with one of value in prefix_map
+   * if extracted path starts with "./" or "../", it's relatively to current file
+   * if extracted path is absolute path, use that path
+   * if extracted path has prefix in the --prefix_map, we replace that prefix with the provided mapping. Then we resolve the mapped path with current pwd.
+* We'll do this parsing recursively for all files with --instruction_extensions
+* Once done, we collect all the extracted paths and the original --paths.
+* Then we'll output using the below template
+
+Project Path: {{ absolute_code_path }}
+
+Source Tree:
+
+```
+{{ source_tree }}
+{{#each files}}
+{{#if code}}
+{{path}}:
+
+{{code}}
+
+{{/if}}
+{{/each}}
+```

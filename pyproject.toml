@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "file-prompt"
+version = "0.1.0"
+description = "A memory-efficient tool to extract and process file paths"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+    { name = "ntdunglc", email = "ntdunglc@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "click>=8.1.0",
+    "jinja2>=3.0.0",
+    "pathspec>=0.11.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ntdunglc/file-prompt"
+Repository = "https://github.com/ntdunglc/file-prompt.git"
+Issues = "https://github.com/ntdunglc/file-prompt/issues"
+
+[project.scripts]
+file-prompt = "file_prompt.click_app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/file_prompt"]
+
+[tool.hatch.build]
+include = [
+    "/src/file_prompt",
+    "README.md",
+]
